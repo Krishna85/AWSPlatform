@@ -1,0 +1,301 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Krishna - Cloud formation test",
+	
+	"Parameters" : {
+						"InstanceType" : {
+													"Type" : "String",
+													"Default" : "t2.micro",
+													"AllowedValues" : ["t2.micro", "t2.small", "t2.large"],
+													"Description" : "Enter the instance type for NATGW. Default is t2.micro."
+												  },
+						"KeyPair" : {
+													"Type" : "AWS::EC2::KeyPair::KeyName",
+													"Description" : "Enter the Key Pair to use"
+												  }
+					},
+	
+	"Resources": {
+		"KrishnaIG" : {
+         "Type" : "AWS::EC2::InternetGateway",
+         "Properties" : {
+         }
+      },
+	"KrishnaVPC": {
+										"Type" : "AWS::EC2::VPC",
+										"Properties" : {
+															"CidrBlock" : "10.10.0.0/16"
+														}
+
+				  },
+	"KrishEIP":{
+										"Type" : "AWS::EC2::EIP",
+										"Properties" : {
+															"InstanceId" : { "Ref" : "KrishNATGW" }
+		
+														},
+										"DependsOn" : "KrishNATGW"
+					},
+	"KrishNATGW":{
+										"Type" : "AWS::EC2::Instance",
+										"Properties" : {
+															"ImageId" : "ami-b73b63a0",
+															"KeyName" : {"Ref" : "KeyPair"}, 
+															"UserData" : "IyEvYmluL2Jhc2gNCnN1ZG8gIHN1IC0NCnN1ZG8gZWNobyAxID4gL3Byb2Mvc3lzL25ldC9pcHY0L2lwX2ZvcndhcmQNCmlwdGFibGVzIC10IG5hdCAtQSAgUE9TVFJPVVRJTkcgISAtZCAxMC4xMC4wLjAvMTYgLWogTUFTUVVFUkFERSA=",
+															"SubnetId" : { "Ref" : "KrishSubnetNew"},
+															"InstanceType" : { "Ref" : "InstanceType" },
+															"SourceDestCheck" : "False",
+															"SecurityGroupIds": [{"Ref" :"KrishSG1"}]
+		
+														}
+					},
+					
+	"EIPNEW":{
+										"Type" : "AWS::EC2::EIP",
+										"Properties" : {
+															"Domain" : "vpc"
+		
+														}
+										
+				},
+					
+	"NATGWNEW" : {
+				"Type" : "AWS::EC2::NatGateway",
+				"Properties" : {
+									"AllocationId" : { "Fn::GetAtt" : ["EIPNEW", "AllocationId"]},
+									"SubnetId" : { "Ref" : "KrishSubnetNew"}
+									},
+					"DependsOn" : "EIPNEW"
+			},
+	"KrishTestEC2":{
+										"Type" : "AWS::EC2::Instance",
+										"Properties" : {
+															"ImageId" : "ami-b73b63a0",
+															"KeyName" : {"Ref" : "KeyPair"}, 
+															"SubnetId" : { "Ref" : "KrishSubnetNew"},
+															"InstanceType" : "t2.micro",
+															"SourceDestCheck" : "False",
+															"SecurityGroupIds": [{"Ref" :"KrishSG1"}]
+		
+														}
+					},
+	"KrishnaAttachGateway" : {
+   "Type" : "AWS::EC2::VPCGatewayAttachment",
+   "Properties" : {
+      "VpcId" : { "Ref" : "KrishnaVPC" },
+      "InternetGatewayId" : { "Ref" : "KrishnaIG" }	
+   }
+
+},
+
+
+						"KrishSubnet": {
+										"Type" : "AWS::EC2::Subnet",
+										"Properties" : {
+														"CidrBlock" : "10.10.1.0/24",
+														"VpcId" : { "Ref": "KrishnaVPC" },
+														"AvailabilityZone" : {"Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ]  }
+
+														}
+										}, 
+						"KrishSubnetNew": {
+										"Type" : "AWS::EC2::Subnet",
+										"Properties" : {
+														"CidrBlock" : "10.10.2.0/24",
+														"AvailabilityZone" : {"Fn::Select" : [ "1", { "Fn::GetAZs" : "" } ]  },
+														"VpcId" : { "Ref": "KrishnaVPC" }
+
+														}
+										}, 
+										
+						"KrishSubnetNew1": {
+										"Type" : "AWS::EC2::Subnet",
+										"Properties" : {
+														"CidrBlock" : "10.10.3.0/24",
+														"AvailabilityZone" : {"Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ]  },
+														"VpcId" : { "Ref": "KrishnaVPC" }
+
+														}
+										}, 
+
+
+	"KrishSG1":{
+									"Type" : "AWS::EC2::SecurityGroup",
+									"Properties" : {
+													"GroupDescription" : "Krishna test SG for NATGW",
+													"SecurityGroupEgress" : [ { "IpProtocol" : "-1" , "FromPort" : "0" , "ToPort": "65535", "CidrIp": "0.0.0.0/0" }],
+													"SecurityGroupIngress" : [{ "IpProtocol" : "-1" , "FromPort" : "0" , "ToPort": "65535", "CidrIp": "10.10.0.0/16" } ,{ "IpProtocol" : "TCP" , "FromPort" : "22" , "ToPort": "22", "CidrIp": "74.200.26.0/25" } ],
+													
+													"VpcId" : { "Ref" : "KrishnaVPC" }
+													}
+									},
+		"KrishSG":{
+									"Type" : "AWS::EC2::SecurityGroup",
+									"Properties" : {
+													"GroupDescription" : "Krishna test SG",
+													"SecurityGroupEgress" : [ { "IpProtocol" : "-1" , "FromPort" : "0" , "ToPort": "65534", "CidrIp": "0.0.0.0/0" } ],
+													"SecurityGroupIngress" : [{ "IpProtocol" : "TCP" , "FromPort" : "80" , "ToPort": "80", "CidrIp": "10.10.0.0/16" } ,{ "IpProtocol" : "TCP" , "FromPort" : "22" , "ToPort": "22", "CidrIp": "10.10.0.0/16" } ],
+													
+													"VpcId" : { "Ref" : "KrishnaVPC" }
+													}
+									},
+	"KrishSGELB":{
+									"Type" : "AWS::EC2::SecurityGroup",
+									"Properties" : {
+													"GroupDescription" : "Krishna test SG for ELB",
+													"SecurityGroupEgress" : [ { "IpProtocol" : "-1" , "FromPort" : "0" , "ToPort": "65534", "CidrIp": "0.0.0.0/0" } ],
+													"SecurityGroupIngress" : [{ "IpProtocol" : "TCP" , "FromPort" : "80" , "ToPort": "80", "CidrIp": "74.200.26.0/25" }],
+													
+													"VpcId" : { "Ref" : "KrishnaVPC" }
+													}
+									},
+
+	"KrishnaLC":{
+				"Type" : "AWS::AutoScaling::LaunchConfiguration",
+				"Properties" : {
+				"ImageId" : "ami-b73b63a0",
+				"KeyName" : {"Ref" : "KeyPair"}, 
+				"SecurityGroups" : [{ "Ref" : "KrishSG" }],
+				"InstanceType" : "t2.micro",
+				"UserData" : "IyEvYmluL2Jhc2gNCnN1ZG8gc3UgLQ0Kc3VkbyAgeXVtIHVwZGF0ZSAteQ0Kc3VkbyB5dW0gaW5zdGFsbCAteSBuZ2lueA0Kc3VkbyBzZXJ2aWNlIG5naW54IHN0YXJ0DQo="
+							}
+			  },	
+	"KrishnaELB":{
+													"Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+													"Properties" : {
+																		
+																		"Listeners" : [ {
+																							"LoadBalancerPort" : "80",
+																							"InstancePort" : "80" ,
+																							"Protocol" : "HTTP"
+																						} 
+																					  ],
+																		"HealthCheck" : {
+																							"Target" : "TCP:80",    
+																							"HealthyThreshold" : "2",
+																							"UnhealthyThreshold" : "2",
+																							"Interval" : "10",
+																								"Timeout" : "5"
+																						},
+																		"Scheme" : "internet-facing",
+																		"SecurityGroups" : [{ "Ref" : "KrishSGELB" }],
+																		"Subnets" : [{ "Ref" : "KrishSubnetNew"},{ "Ref" : "KrishSubnetNew1"}]
+																	},
+													"DependsOn" : "KrishnaIG"
+							},
+							
+			  
+	"KrishnaASG":{
+				"Type" : "AWS::AutoScaling::AutoScalingGroup",
+				"Properties" : {
+										"Cooldown" : "10",
+										"DesiredCapacity" : "2",
+										"HealthCheckGracePeriod" : "10",
+										"HealthCheckType" : "EC2",
+										"LaunchConfigurationName" : { "Ref" : "KrishnaLC"},
+										"LoadBalancerNames" : [ { "Ref" : "KrishnaELB"}],
+										"MaxSize" : "3",
+										"MinSize" : "1",
+										"VPCZoneIdentifier" : [{ "Ref" : "KrishSubnet" }]
+																	
+											
+							},
+				"DependsOn" : "KrishEIP"
+			  },
+	"KrishnaRouteTable" : {
+         "Type" : "AWS::EC2::RouteTable",
+         "Properties" : {
+           			 "VpcId" : { "Ref" : "KrishnaVPC" }
+					
+			}
+		      },
+	"KrishnaRouteTableNew" : {
+         "Type" : "AWS::EC2::RouteTable",
+         "Properties" : {
+           			 "VpcId" : { "Ref" : "KrishnaVPC" }
+					
+			}
+		      },
+	"KrishnaRouteTableNew1" : {
+         "Type" : "AWS::EC2::RouteTable",
+         "Properties" : {
+           			 "VpcId" : { "Ref" : "KrishnaVPC" }
+					
+			}
+		      },
+
+"KrishnaRoute" : {
+         "Type" : "AWS::EC2::Route",
+         "Properties" : {
+            "RouteTableId" : { "Ref" : "KrishnaRouteTable" },
+            "DestinationCidrBlock" : "0.0.0.0/0",
+            "NatGatewayId" : { "Ref" : "NATGWNEW" }
+			},
+			"DependsOn" : "NATGWNEW"
+         
+      },
+	  
+"KrishnaRouteNew" : {
+         "Type" : "AWS::EC2::Route",
+         "Properties" : {
+            "RouteTableId" : { "Ref" : "KrishnaRouteTableNew" },
+            "DestinationCidrBlock" : "0.0.0.0/0",
+            "GatewayId" : { "Ref" : "KrishnaIG" }
+			},
+			"DependsOn" : "KrishnaIG"
+         
+      },
+"KrishnaRouteNew1" : {
+         "Type" : "AWS::EC2::Route",
+         "Properties" : {
+            "RouteTableId" : { "Ref" : "KrishnaRouteTableNew1" },
+            "DestinationCidrBlock" : "0.0.0.0/0",
+            "GatewayId" : { "Ref" : "KrishnaIG" }
+			},
+			"DependsOn" : "KrishnaIG"
+         
+      },
+
+
+"KrishnaRouteTableAssociation" : {
+         "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+         "Properties" : {
+            "SubnetId" : { "Ref" : "KrishSubnet" },
+            "RouteTableId" : { "Ref" : "KrishnaRouteTable" }
+         }
+      },
+
+				
+"KrishnaRouteTableAssociationNew" : {
+         "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+         "Properties" : {
+            "SubnetId" : { "Ref" : "KrishSubnetNew" },
+            "RouteTableId" : { "Ref" : "KrishnaRouteTableNew" }
+						}
+			},
+      
+
+				
+			
+"KrishnaRouteTableAssociationNew1" : {
+         "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+         "Properties" : {
+            "SubnetId" : { "Ref" : "KrishSubnetNew1" },
+            "RouteTableId" : { "Ref" : "KrishnaRouteTableNew1" }
+						}
+			} 
+
+},			
+
+						
+
+"Outputs" : {
+  "LoadBalancerName" : {
+    "Description": "The Name of the load balancer is",  
+        "Value" : { "Ref" : "KrishnaELB" }
+    
+  }
+  }
+			
+}
+
